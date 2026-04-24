@@ -7,9 +7,9 @@ import com.advpro.profiling.tutorial.repository.StudentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * @author muhammad.khadafi
@@ -24,40 +24,22 @@ public class StudentService {
     private StudentCourseRepository studentCourseRepository;
 
     public List<StudentCourse> getAllStudentsWithCourses() {
-        List<Student> students = studentRepository.findAll();
-        List<StudentCourse> studentCourses = new ArrayList<>();
-        for (Student student : students) {
-            List<StudentCourse> studentCoursesByStudent = studentCourseRepository.findByStudentId(student.getId());
-            for (StudentCourse studentCourseByStudent : studentCoursesByStudent) {
-                StudentCourse studentCourse = new StudentCourse();
-                studentCourse.setStudent(student);
-                studentCourse.setCourse(studentCourseByStudent.getCourse());
-                studentCourses.add(studentCourse);
-            }
-        }
-        return studentCourses;
+        //Mencegah N+1 Query Problem dengan langsung mengambil seluruh relasi
+        return studentCourseRepository.findAll();
     }
 
     public Optional<Student> findStudentWithHighestGpa() {
-        List<Student> students = studentRepository.findAll();
-        Student highestGpaStudent = null;
-        double highestGpa = 0.0;
-        for (Student student : students) {
-            if (student.getGpa() > highestGpa) {
-                highestGpa = student.getGpa();
-                highestGpaStudent = student;
-            }
-        }
-        return Optional.ofNullable(highestGpaStudent);
+        //Menggunakan query level database (ORDER BY gpa DESC LIMIT 1)
+        // jauh lebih cepat daripada memuat 20.000 data ke memori aplikasi.
+        return Optional.ofNullable(studentRepository.findFirstByOrderByGpaDesc());
     }
 
     public String joinStudentNames() {
         List<Student> students = studentRepository.findAll();
-        String result = "";
-        for (Student student : students) {
-            result += student.getName() + ", ";
-        }
-        return result.substring(0, result.length() - 2);
+        //Menggunakan Stream API dan Collectors.joining (StringBuilder internal)
+        // untuk menghindari penalti performa fatal dari konkatenasi String (+=) di dalam loop.
+        return students.stream()
+                .map(Student::getName)
+                .collect(Collectors.joining(", "));
     }
 }
-
